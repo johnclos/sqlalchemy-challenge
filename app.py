@@ -51,7 +51,7 @@ def welcome():
     f"/api/v1.0/precipitation<br/>"
     f"/api/v1.0/stations<br/>"
     f"/api/v1.0/tobs<br/>"
-    f"/api/v1.0/temps")
+    f"/api/v1.0/<startdate>/<enddate>")
     return(test)
 
 # `/api/v1.0/precipitation`
@@ -116,10 +116,14 @@ def tobs():
 # `/api/v1.0/<start>` and `/api/v1.0/<start>/<end>`
     # Return a JSON list of the minimum temperature, the average temperature, and the max temperature 
         # for a given start or start-end range.
-@app.route("/api/v1.0/temps/")
+@app.route("/api/v1.0/<startdate>")
+@app.route("/api/v1.0/<startdate>/<enddate>")
 def dates(startdate = None, enddate = None):
-
+    # to pass in flask
     temp_calc = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+    
+    startdate = datetime(startdate)
+    enddate = datetime(enddate)
     
     if not enddate:
     # When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater than and 
