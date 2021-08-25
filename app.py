@@ -1,10 +1,6 @@
 ## Hints
 # You will need to join the station and measurement tables for some of the queries.
 # Use Flask `jsonify` to convert your API data into a valid JSON response object.
-%matplotlib inline
-from matplotlib import style
-style.use('fivethirtyeight')
-import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
@@ -22,15 +18,14 @@ from flask import Flask, jsonify
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+engine = create_engine("sqlite:///Resources/hawaii.sqlite", connect_args={'check_same_thread': False})
+
+# add as conn, with this argument: check_same_thread=False
 
 # reflect an existing database into a new model
 # reflect the tables
 Base = automap_base()
 Base.prepare(engine, reflect = True)
-
-# View all of the classes that automap found
-Base.classes.keys()
 
 # Save references to each table
 Measurement = Base.classes.measurement
@@ -51,12 +46,13 @@ app = Flask(__name__)
 # `/` Home page.  List all routes that are available.
 @app.route("/")
 def welcome():
-    test = (f"Welcome to the Hawaii Climate Analysis API!"<br/>
-    f"Available Data:"<br/>
+    test = (f"Welcome to the Hawaii Climate Analysis API!<br/>"
+    f"Available Data:<br/>"
     f"/api/v1.0/precipitation<br/>"
     f"/api/v1.0/stations<br/>"
-    f"/api/v1.0/tobs<br/>""
-    f"/api/v1.0/<start>/<end>")
+    f"/api/v1.0/tobs<br/>"
+    f"/api/v1.0/temps")
+    return(test)
 
 # `/api/v1.0/precipitation`
     # Convert the query results to a dictionary using `date` as the key and `prcp` as the value.
@@ -80,9 +76,6 @@ def precipitation():
     latest = session.query(Measurement.date, Measurement.prcp).filter(Measurement.date >= latest_date_minus_year).\
         order_by(Measurement.date).all()
 
-    latest_df = pd.DataFrame(latest)
-    latest_df['prcp'] = latest_df['prcp'].fillna(0)
-
     # Dict with date as the key and prcp as the value
     precip = {date: prcp for date, prcp in latest}
     return jsonify(precip)
@@ -92,10 +85,10 @@ def precipitation():
 @app.route("/api/v1.0/stations")
 def stations():
     # Design a query to return a list of stations
-    stations = session.query(Station.station).all()
+    stations_result = session.query(Station.station).all()
     
     # Convert to a list
-    stations_list = list(np.ravel(stations))
+    stations_list = list(np.ravel(stations_result))
     return jsonify(stations_list = stations_list)
 
 # `/api/v1.0/tobs`
@@ -113,25 +106,35 @@ def tobs():
     latest_date_minus_year = latest_date_ref - timedelta(days = 365)
 
     # Design a query to retrieve the last 12 months of temperature observation data (TOBS) for the primary station.
-    temps = session.query(Measurement.tobs).filter(Measurement.station == 'USC00519281').filter(Measurement.date >= latest_date_minus_year).all()
+    tobs_results = session.query(Measurement.tobs).filter(Measurement.station == 'USC00519281').\
+        filter(Measurement.date >= latest_date_minus_year).all()
 
     # Convert to a list
-    temps_list = list(np.ravel(temps))
-    return jsonify(temps_list = temps_list)
+    tobs_list = list(np.ravel(tobs_results))
+    return jsonify(tobs_list = tobs_list)
 
 # `/api/v1.0/<start>` and `/api/v1.0/<start>/<end>`
     # Return a JSON list of the minimum temperature, the average temperature, and the max temperature 
         # for a given start or start-end range.
-@app.route("/api/v1.0/<start>")
-@app.route("/api/v1.0/<start>/<end>")
-def dates(start = None, end = None):
+@app.route("/api/v1.0/temps/")
+def dates(startdate = None, enddate = None):
+
+    temp_calc = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+    
+    if not enddate:
     # When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater than and 
         # equal to the start date.
-
-
-    # When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for dates 
-        # between the start and end date inclusive.
-
-
-if __name__ = '__main__':
+        temp_data = session.query(*temp_calc).filter(Measurement.date >= startdate).all()
+    
+    else:
+        # When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for dates 
+            # between the start and end date inclusive.
+        temp_data = session.query(*temp_calc).filter(Measurement.date >= startdate).\
+            filter(Measurement.date <= enddate).all()
+    
+    # Convert to a list
+    temp_data_list = list(np.ravel(temp_data))
+    return jsonify(temp_data_list = temp_data_list)
+ 
+if __name__ == '__main__':
     app.run()
